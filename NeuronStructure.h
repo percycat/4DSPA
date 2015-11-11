@@ -46,14 +46,14 @@ public:
 	//==================================//
 	//	functions related to branches	//
 	//==================================//
-	bool getBranch( int i, NeuronBranch& branch  ); //query a branch by branch ID;
+	bool getBranch( int branchID, NeuronBranch& branch  ); //query a branch by branch ID;
 	bool getBranch( VectorCoordinate v, NeuronBranch& branch ); //query a branch by a tip;
 	
-	double getBranchLength( int idx );
-	double getBranchLength( int idx, int s, int e );
+	double getBranchLength( int branchID );
+	double getBranchLength( int branchID, int s, int e );
 	
 	int getBranchID(int i);		//given the access index of a branch, query it's id 
-	int getBranchIndex(int id);	//given a branch's id, query it's access index.
+	int getBranchIndex(int branchID);	//given a branch's id, query it's access index.
 
 	bool getBranchType( int branchID, BranchType& type );
 	void setBranchType( int branchID, BranchType type );
