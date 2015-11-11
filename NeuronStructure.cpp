@@ -51,10 +51,15 @@ void NeuronStruct::SetUp( )
 		}
 	}
 
-
 	numNodes = Nodes.size();//nSize;
 	std::cout<<Nodes.size()<<'\n';
-
+	/*
+	for(int i=0; i<NodeHashList.size(); ++i)
+	{
+		NodeSearchListType::iterator Itr = NodeHashList[i].begin();
+		for(;Itr != NodeHashList[i].end(); ++Itr )
+			std::cout<<Itr->first<<'\t'<<Itr->second<<'\n';
+	}*/
 }
 
 
@@ -193,12 +198,9 @@ double NeuronStruct::getNeuronSize()
 			{
 				visited[ idx ] = true;
 				L += (Branches[i].points[j] - Branches[i].points[j-1]).Length();
-				//std::cout<<Branches[i].points[j]<<'\n';
 			}
 			else
 			{
-				//std::cout<<Branches[i].points[j]<<' '<<idx<<'\n';
-				//system("pause");
 				break;
 			}
 		}
@@ -249,10 +251,17 @@ bool NeuronStruct::getNode( int i, VectorCoordinate& v )
 
 }
 
-bool NeuronStruct::getBranch( int id,  NeuronBranch& branch )
+bool NeuronStruct::getBranch( int branchID,  NeuronBranch& branch )
 {
-	
-	return true;
+	std::map<int, int>::iterator Itr = BranchIdxTable.find( branchID );
+
+	if( Itr != BranchIdxTable.end() )
+	{
+		branch = Branches[ Itr->second ];
+		return true;
+	}
+
+	return false;
 }
 
 bool NeuronStruct::getBranch( VectorCoordinate v,  NeuronBranch& branch )
@@ -270,39 +279,53 @@ bool NeuronStruct::getBranch( VectorCoordinate v,  NeuronBranch& branch )
 	return false;
 }
 
-double NeuronStruct::getBranchLength( int idx )	// if return value = -1, the query is invalid.
+double NeuronStruct::getBranchLength( int branchID )	// if return value = -1, the query is invalid.
 {
-	double L = .0;
+	std::map<int, int>::iterator Itr = BranchIdxTable.find( branchID );
 
-	if( idx < 0 || idx > Branches.size() )
-		return -1.0;
-
-	for(int i=1; i<Branches[ idx ].points.size(); ++i)
+	
+	if( Itr != BranchIdxTable.end() )
 	{
-		VectorCoordinate v = Branches[ idx ].points[ i ] - Branches[ idx ].points[ i - 1 ];
-		L += v.Length();
-	}
+		double L = .0;
 
-	return L;
+		int idx = Itr->second;
+
+		for(int i=1; i<Branches[ idx ].points.size(); ++i)
+		{
+			VectorCoordinate v = Branches[ idx ].points[ i ] - Branches[ idx ].points[ i - 1 ];
+			L += v.Length();
+		}
+
+		return L;
+	}
+	else
+		return -1;
 }
 
-double NeuronStruct::getBranchLength(int idx, int s, int e )	// if return value = -1, the query is invalid.
+double NeuronStruct::getBranchLength(int branchID, int s, int e )	// if return value = -1, the query is invalid.
 {
-	double L = .0;
+	std::map<int, int>::iterator Itr = BranchIdxTable.find( branchID );
 
-	if( idx < 0 || idx > Branches.size() )
+	if( Itr == BranchIdxTable.end() )
 		return -1.0;
 
+	int idx = Itr->second;
 	if( s > e || s < 0 || e >= Branches[idx].points.size() )
 		return -1.0;
-
-	for(int i=1; i<Branches[ idx ].points.size(); ++i)
+	else
 	{
-		VectorCoordinate v = Branches[ idx ].points[ i ] - Branches[ idx ].points[ i - 1 ];
-		L += v.Length();
-	}
+		double L = .0;
 
-	return L;
+		for(int i=1; i<Branches[ idx ].points.size(); ++i)
+		{
+			double L = .0;
+			VectorCoordinate v = Branches[ idx ].points[ i ] - Branches[ idx ].points[ i - 1 ];
+			L += v.Length();
+		}
+
+		return L;
+	}
+	
 }
 
 int NeuronStruct::queryNodeIdx( VectorCoordinate v )	//report the access index of v in Nodes, return -1 if v is not in Nodes.
@@ -447,33 +470,39 @@ void NeuronStruct::NonOverlapVariation( NeuronStruct& N, std::vector< std::pair<
 					lengthThis += ( v2 - v1 ).Length();
 				}
 				else
+				{
 					break;
+				}
 			}
 		}
 
 		NeuronBranch B;
-		N.getBranch( idxN, B );
-
-		for(int j=B.points.size() - 1 ; j > 0; --j)
+		int nBranchID = N.getBranchID( idxN );
+		if( nBranchID >= 0 && N.getBranch( nBranchID, B ) )
 		{
-			VectorCoordinate v1 = B.points[ j ];
-			VectorCoordinate v2 = B.points[ j - 1 ];
-
-			int nodeIdx1 = N.queryNodeIdx( v1 );
-		
-			if( nodeIdx1 >= 0 )
+			for(int j=B.points.size() - 1 ; j > 0; --j)
 			{
-				if( !visitedN[ nodeIdx1 ] )
-				{
-					visitedN[ nodeIdx1 ] = true;
-					lengthN += ( v2 - v1 ).Length();
-				}
-				else
-					break;
-			}
-		}
+				VectorCoordinate v1 = B.points[ j ];
+				VectorCoordinate v2 = B.points[ j - 1 ];
 
-		Variation.push_back( std::pair<int, double>( idxThis, lengthN - lengthThis ) );
+				int nodeIdx1 = N.queryNodeIdx( v1 );
+		
+				if( nodeIdx1 >= 0 )
+				{
+					if( !visitedN[ nodeIdx1 ] )
+					{
+						visitedN[ nodeIdx1 ] = true;
+						lengthN += ( v2 - v1 ).Length();
+					}
+					else
+					{
+						break;
+					}
+				}
+			}
+
+			Variation.push_back( std::pair<int, double>( idxThis, lengthN - lengthThis ) );
+		}
 	}
 
 	//Compute the variations of the retracted branches
@@ -508,26 +537,30 @@ void NeuronStruct::NonOverlapVariation( NeuronStruct& N, std::vector< std::pair<
 		int idxN = addedIDs[i];
 
 		NeuronBranch B;
-		N.getBranch( idxN, B );
-		double lengthN = .0;
-		for(int j=B.points.size() - 1 ; j > 0; --j)
-		{
-			VectorCoordinate v1 = B.points[ j ];
-			VectorCoordinate v2 = B.points[ j - 1 ];
+		int nBranchID = N.getBranchID( idxN );
 
-			int nodeIdx1 = N.queryNodeIdx( v1 );
-			
-			if( nodeIdx1 >= 0 )
+		if( nBranchID >= 0 && N.getBranch( nBranchID, B ) )
+		{
+			double lengthN = .0;
+			for(int j=B.points.size() - 1 ; j > 0; --j)
 			{
-				if( !visitedN[ nodeIdx1 ]  )
+				VectorCoordinate v1 = B.points[ j ];
+				VectorCoordinate v2 = B.points[ j - 1 ];
+
+				int nodeIdx1 = N.queryNodeIdx( v1 );
+			
+				if( nodeIdx1 >= 0 )
 				{
-					visitedN[ nodeIdx1 ] = true;
-					lengthN += ( v2 - v1 ).Length();
+					if( !visitedN[ nodeIdx1 ]  )
+					{
+						visitedN[ nodeIdx1 ] = true;
+						lengthN += ( v2 - v1 ).Length();
+					}
 				}
 			}
-		}
 
-		Variation.push_back( std::pair<int, double>( idxN, lengthN ) );
+			Variation.push_back( std::pair<int, double>( idxN, lengthN ) );
+		}
 	}
 
 	delete [] visitedN;
@@ -607,17 +640,19 @@ void NeuronStruct::OverlapVariation( NeuronStruct& N, std::vector< std::pair< in
 		}
 
 		NeuronBranch B;
-		N.getBranch( idxN, B );
-
-		for(int j=1 ; j < B.points.size(); ++j)
+		int nBranchID = N.getBranchID( idxN );
+		if( nBranchID >= 0 && N.getBranch( nBranchID, B ) )
 		{
-			VectorCoordinate v1 = B.points[ j ];
-			VectorCoordinate v2 = B.points[ j - 1 ];
+			for(int j=1 ; j < B.points.size(); ++j)
+			{
+				VectorCoordinate v1 = B.points[ j ];
+				VectorCoordinate v2 = B.points[ j - 1 ];
 			
-			lengthN += ( v2 - v1 ).Length();
-		}
+				lengthN += ( v2 - v1 ).Length();
+			}
 
-		Variation.push_back( std::pair<int, double>( idxThis, lengthN - lengthThis ) );
+			Variation.push_back( std::pair<int, double>( idxThis, lengthN - lengthThis ) );
+		}
 	}
 
 	//Compute the variations of the retracted branches
@@ -644,17 +679,22 @@ void NeuronStruct::OverlapVariation( NeuronStruct& N, std::vector< std::pair< in
 		int idxN = addedIDs[i];
 
 		NeuronBranch B;
-		N.getBranch( idxN, B );
-		double lengthN = .0;
-		for(int j=1; j < B.points.size(); ++j)	//track from soma to tip
+		int nBranchID = N.getBranchID( idxN );
+
+		if( nBranchID >= 0 && N.getBranch( nBranchID, B ) )
 		{
-			VectorCoordinate v1 = B.points[ j ];
-			VectorCoordinate v2 = B.points[ j - 1 ];
+			double lengthN = .0;
+			for(int j=1; j < B.points.size(); ++j)	//track from soma to tip
+			{
+				VectorCoordinate v1 = B.points[ j ];
+				VectorCoordinate v2 = B.points[ j - 1 ];
 
-			lengthN += ( v2 - v1 ).Length();
+				lengthN += ( v2 - v1 ).Length();
+			}
+
+			Variation.push_back( std::pair<int, double>( idxN, lengthN ) );
 		}
-
-		Variation.push_back( std::pair<int, double>( idxN, lengthN ) );
+		
 	}
 
 }
